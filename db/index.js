@@ -138,22 +138,34 @@ async function _getReport(reportId) {
 async function closeReport(reportId, password) {
   try {
     // First, actually grab the report with that id
-    
+    const report = await _getReport(reportId);
 
     // If it doesn't exist, throw an error with a useful message
-    
+    if (!report){
+      throw Error('Report does not exist with that id');
+    }
   
     // If the passwords don't match, throw an error
-    
+    if(report.password !== password){
+      throw Error('Password incorrect for this report, please try again');
+    }
 
     // If it has already been closed, throw an error with a useful message
-    
+    if (!report.isOpen){
+      throw Error('This report has already been closed');
+    }
 
     // Finally, update the report if there are no failures, as above
-    
+    await client.query(`
+      UPDATE reports
+      SET "isOpen"='false'
+      WHERE id=$1;
+    `, [reportId]);
 
     // Return a message stating that the report has been closed
-    
+    return{
+      message: 'Report successfully closed!'
+    };
 
   } catch (error) {
     throw error;
@@ -173,31 +185,45 @@ async function closeReport(reportId, password) {
  */
 async function createReportComment(reportId, commentFields) {
   // read off the content from the commentFields
-
+const { content } = commentFields;
 
   try {
     // grab the report we are going to be commenting on
-
+    const report = await _getReport(reportId);
 
     // if it wasn't found, throw an error saying so
-    
+    if (!report){
+      throw Error('That report does not exist, no comment has been made');
+    }
 
     // if it is not open, throw an error saying so
-    
+    if (!report.isOpen){
+      throw Error('That report has been closed, no comment has been made');
+    }
 
     // if the current date is past the expiration, throw an error saying so
     // you can use Date.parse(report.expirationDate) < new Date() to check
-    
+    if (Date.parse(report.expirationDate) < new Date()){
+      throw Error('The discussion time on this report has expired, no comment has been made');
+    }
 
     // all go: insert a comment
-    
+    const { rows: [comment] } = await client.query(`
+      INSERT INTO comments("reportId", content)
+      VALUES ($1, $2)
+      RETURNING *;
+    `, [reportId, content]);
 
     // then update the expiration date to a day from now
-    
+    await client.query(`
+    UPDATE reports
+    SET "expirationDate" = CURRENT_TIMESTAMP + interval '1 day'
+    WHERE id=$1
+    RETURNING *;
+    `, [reportId]);
 
     // finally, return the comment
-    
-
+    return comment;
   } catch (error) {
     throw error;
   }
@@ -206,6 +232,7 @@ async function createReportComment(reportId, commentFields) {
 // export the client and all database functions below
 module.exports = { 
   client,
+  _getReport,
   createReport,
   closeReport,
   getOpenReports,
