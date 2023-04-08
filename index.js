@@ -1,5 +1,6 @@
 // Use the dotenv package, to create environment variables
 require('dotenv').config();
+const path = require('path');
 // Create a constant variable, PORT, based on what's in process.env.PORT or fallback to 3000
 
 // Import express, and create a server
@@ -16,7 +17,11 @@ const { client } = require('./db');
 // Have the server use cors()
 app.use(cors());
 // Have the server use bodyParser.json()
+app.use(bodyParser.json());
 
+app.use('/dist', express.static(path.join(__dirname, 'dist')));
+
+app.get('/', (req, res)=> res.sendFile(path.join(__dirname, 'index.html')));
 // Have the server use your api router with prefix '/api'
 const  { router } = require('./api/index.js');
 app.use('/api', router)
